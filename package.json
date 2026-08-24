@@ -1,0 +1,50 @@
+{
+  "name": "chinallm-bench",
+  "productName": "ChinaLLM Bench",
+  "version": "0.1.0",
+  "description": "Comparateur de LLM chinois avec recherche web et calcul de coût en temps reel",
+  "main": "out/main/index.js",
+  "author": "ChinaLLM Bench",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "build:win": "electron-vite build && electron-builder --win --x64",
+    "postinstall": "electron-builder install-app-deps",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts,.tsx",
+    "probe": "tsx scripts/probe.ts"
+  },
+  "dependencies": {
+    "electron-store": "^10.0.0",
+    "js-tiktoken": "^1.0.14",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "recharts": "^2.13.0",
+    "remark-gfm": "^4.0.0",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^7.16.0",
+    "@typescript-eslint/parser": "^7.16.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "autoprefixer": "^10.4.19",
+    "electron": "39.4.0",
+    "electron-builder": "^26.15.7",
+    "electron-vite": "^5.0.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.35.0",
+    "postcss": "^8.4.40",
+    "tailwindcss": "^3.4.7",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.11"
+  }
+}
