@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Au Petit Marché - Évaluation ConsoMyZone</title>
+<style>
+  :root {
+    --primary: #2c5f2d;
+    --primary-dark: #1e4620;
+    --accent: #d4a24c;
+    --accent-light: #f4d08a;
+    --bg: #fafaf5;
+    --card: #ffffff;
+    --text: #222;
+    --muted: #6b6b6b;
+    --border: #e6e2d6;
+    --good: #2c7a3a;
+    --warn: #c98a1d;
+    --bad: #b23a3a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  /* ====== TOP BAR ====== */
+  .topbar {
+    background: var(--primary-dark);
+    color: #fff;
+    padding: 10px 24px;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .topbar .logo {
+    font-weight: 700;
+    letter-spacing: 1px;
+    font-size: 15px;
+  }
+  .topbar .logo span { color: var(--accent-light); }
+
+  /* ====== HEADER ====== */
+  header.hero {
+    position: relative;
+    height: 420px;
+    background:
+      linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,.35)),
+      url('https://images.unsplash.com/photo-1555396273-367ea4eb4db6?w=1600&q=80') center/cover no-repeat;
+    display: flex;
+    align-items: flex-end;
+    padding: 40px;
+    color: #fff;
+  }
+  .hero-content { max-width: 1200px; width: 100%; margin: 0 auto; }
+  .hero-content h1 {
+    font-size: 48px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    text-shadow: 2px 2px 8px rgba(0,0,0,.5);
+  }
+  .hero-content .subtitle {
+    font-size: 18px;
+    margin-bottom: 16px;
+    opacity: .95;
+  }
+  .badges {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .badge {
+    background: rgba(255,255,255,.92);
+    color: var(--primary-dark);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .badge.gold { background: var(--accent); color: #fff; }
+
+  /* ====== LAYOUT ====== */
+  .container { max-width: 1200px; margin: 0 auto; padding: 40px 24px; }
+  .grid-main {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 32px;
+  }
+  @media (max-width: 900px) {
+    .grid-main { grid-template-columns: 1fr; }
+    .hero-content h1 { font-size: 34px; }
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  }
+  .card h2 {
+    font-size: 20px;
+    color: var(--primary-dark);
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card h2::before {
+    content: '';
+    width: 6px;
+    height: 22px;
+    background: var(--accent);
+    border-radius: 3px;
+  }
+
+  /* ====== SCORE PANEL ====== */
+  .score-panel {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    border-radius: 12px;
+    padding: 28px;
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .score-big {
+    font-size: 72px;
+    font-weight: 800;
+    color: var(--accent-light);
+    line-height: 1;
+  }
+  .score-max { font-size: 24px; color: rgba(255,255,255,.7); }
+  .recommendation {
+    display: inline-block;
+    margin-top: 14px;
+    background: var(--accent);
+    color: #fff;
+    padding: 8px 20px;
+    border-radius: 24px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: .5px;
+  }
+  .score-label {
+    font-size: 13px;
+    opacity: .85;
+    margin-top: 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* ====== INFO LIST ====== */
+  .info-list { list-style: none; }
+  .info-list li {
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+  }
+  .info-list li:last-child { border-bottom: none; }
+  .info-list .label { color: var(--muted); font-weight: 600; }
+  .info-list .value { font-weight: 500; text-align: right; }
+
+  /* ====== NOTES DETAIL ====== */
+  .note-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .note-row:last-child { border-bottom: none; }
+  .note-name { font-size: 14px; font-weight: 500; }
+  .note-weight {
+    font-size: 11px;
+    color: var(--muted);
+    background: #f0ede1;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  .bar-wrap {
+    width: 120px;
+    height: 10px;
+    background: #edeae0;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--primary));
+  }
+  .note-score {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--primary-dark);
+    min-width: 40px;
+    text-align: right;
+  }
+
+  /* ====== GALLERY ====== */
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 16px 0;
+  }
+  .gallery img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+
+  /* ====== SYNTHÈSE ====== */
+  .synthese {
+    background: #fdf6e3;
+    border-left: 4px solid var(--accent);
+    padding: 16px 20px;
+    border-radius: 6px;
+    font-style: italic;
+    color: #4a3a1a;
+    font-size: 15px;
+  }
+
+  /* ====== AVIS PLATFORMES ====== */
+  .platforms {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .platform {
+    background: #f7f5ec;
+    padding: 14px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid var(--border);
+  }
+  .platform .name {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .platform .rating {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--primary-dark);
+  }
+  .platform .count {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .stars { color: #e8b923; letter-spacing: 2px; font-size: 14px; }
+
+  /* ====== TAGS ====== */
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .tag {
+    background: #eef3e5;
+    color: var(--primary-dark);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  /* ====== FOOTER ====== */
+  footer {
+    background: var(--primary-dark);
+    color: rgba(255,255,255,.8);
+    text-align: center;
+    padding: 24px;
+    font-size: 13px;
+    margin-top: 40px;
+  }
+  footer strong { color: var(--accent-light); }
+
+  .disclaimer {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    margin-bottom: 20px;
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">Conso<span>MyZone</span> • Évaluations locales</div>
+  <div>Analyse du 25 août 2026</div>
+</div>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="hero-content">
+    <h1>Au Petit Marché</h1>
+    <div class="subtitle">📍 39 Pl. du Marché, 44320 Saint-Père-en-Retz — France</div>
+    <div class="badges">
+      <span class="badge">🍽️ Cuisine traditionnelle française</span>
+      <span class="badge">🍕 Pizzas</span>
+      <span class="badge">🍔 Burgers</span>
+      <span class="badge">☀️ Terrasse</span>
+      <span class="badge gold">★ Bon choix</span>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<div class="container">
+
+  <div class="disclaimer">
+    ⚠️ Évaluation réalisée le 25/08/2026 à partir de sources publiques (site officiel, Google, Tripadvisor, Petit Futé, Facebook). Les notes reflètent une synthèse métier pondérée, indépendante des notes brutes des plateformes.
+  </div>
+
+  <div class="grid-main">
+
+    <!-- COLONNE GAUCHE -->
+    <div>
+
+      <!-- SCORE FINAL -->
+      <div class="score-panel">
+        <div class="score-label">Note finale ConsoMyZone</div>
+        <div class="score-big">7.6<span class="score-max"> / 10</span></div>
+        <div class="recommendation">✓ Bon choix</div>
+      </div>
+
+      <!-- SYNTHÈSE -->
+      <div class="card">
+        <h2>Synthèse critique</h2>
+        <div class="synthese">
+          Table familiale sur la place du village, cuisine généreuse de saison à prix doux et accueil souriant — idéal pour un déjeuner décontracté.
+        </div>
+      </div>
+
+      <!-- GALERIE -->
+      <div class="card">
+        <h2>Ambiance & plats</h2>
+        <div class="gallery">
+          <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=500&q=80" alt="Plat traditionnel">
+          <img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=500&q=80" alt="Pizza">
+          <img src="https://images.unsplash.com/photo-1550547660-d9450f859349?w=500&q=80" alt="Burger">
+          <img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&q=80" alt="Salle restaurant">
+          <img src="https://images.unsplash.com/photo-1559339352-11d035aa65de?w=500&q=80" alt="Terrasse">
+          <img src="https://images.unsplash.com/photo-1551218808-94e220e084d2?w=500&q=80" alt="Dessert">
+        </div>
+      </div>
+
+      <!-- NOTES DÉTAILLÉES -->
+      <div class="card">
+        <h2>Évaluation détaillée</h2>
+
+        <div class="note-row">
+          <div>
+            <div class="note-name">Qualité des plats</div>
+          </div>
+          <span class="note-weight">×3.5</span>
+          <div class="bar-wrap"><div class="bar-fill" style="width:75%"></div></div>
+          <div class="note-score">7.5</div>
+        </div>
+
+        <div class="note-row">
+          <div>
+            <div class="note-name">Rapport qualité-prix</div>
+          </div>
+          <span class="note-weight">×2.0</span>
+          <div class="bar-wrap"><div class="bar-fill" style="width:85%"></div></div>
+          <div class="note-score">8.5</div>
+        </div>
+
+        <div class="note-row">
+          <div>
+            <div class="note-name">Service</div>
+          </div>
+          <span class="note-weight">×2.0</span>
+          <div class="bar-wrap"><div class="bar-fill" style="width:75%"></div></div>
+          <div class="note-score">7.5</div>
+        </div>
+
+        <div class="note-row">
+          <div>
+            <div class="note-name">Cadre & ambiance</div>
+          </div>
+          <span class="note-weight">×1.5</span>
+          <div class="bar-wrap"><div class="bar-fill" style="width:70%"></div></div>
+          <div class="note-score">7.0</div>
+        </div>
+
+        <div class="note-row">
