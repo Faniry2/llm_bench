@@ -4,6 +4,7 @@
  *   npm run probe -- qwen
  *   npm run probe -- kimi
  *   npm run probe -- glm
+ *   npm run probe -- chatgpt
  *
  * Sends "Quelle est la date d'aujourd'hui ? Cherche sur le web." with web
  * search enabled and prints the response content + raw usage so each
@@ -15,9 +16,10 @@ import type { ProviderId } from '../src/providers/types.js';
 async function main() {
   const id = process.argv[2] as ProviderId | undefined;
   if (!id || !(id in providerRegistry)) {
-    console.error('Usage: npm run probe -- <deepseek|qwen|kimi|glm>');
+    console.error('Usage: npm run probe -- <deepseek|qwen|kimi|glm|chatgpt> [modelId]');
     process.exit(1);
   }
+  const modelId = process.argv[3];
 
   const apiKey = process.env[envKeyNames[id]];
   if (!apiKey) {
@@ -29,10 +31,10 @@ async function main() {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 180_000);
 
-  console.log(`--- Probing ${provider.label} (${provider.defaultModelId}) ---`);
+  console.log(`--- Probing ${provider.label} (${modelId ?? provider.defaultModelId}) ---`);
 
   const options: Record<string, unknown> =
-    id === 'deepseek'
+    id === 'deepseek' || id === 'chatgpt'
       ? { webSearchMode: 'bridge', bridgeProviderId: 'qwen', bridgeProviderApiKey: process.env.DASHSCOPE_API_KEY }
       : {};
 
@@ -40,6 +42,7 @@ async function main() {
     {
       prompt: "Quelle est la date d'aujourd'hui ? Cherche sur le web.",
       webSearch: true,
+      modelId,
       signal: controller.signal,
       options,
       onDelta: (delta) => {

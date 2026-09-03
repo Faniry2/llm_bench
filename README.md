@@ -25,8 +25,13 @@ Configurables dans l'onglet **🔑 Clés API** de l'application (chiffrées via 
 | Qwen 3.7 Plus | `DASHSCOPE_API_KEY` | [Alibaba Cloud Model Studio / DashScope](https://dashscope.console.aliyun.com) |
 | Kimi K2.6 | `MOONSHOT_API_KEY` | [platform.moonshot.ai](https://platform.moonshot.ai) |
 | GLM‑5.1 | `ZAI_API_KEY` | [z.ai](https://z.ai) (Z.ai Open Platform) |
+| ChatGPT (GPT‑5.1) | `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com) |
 
 Les clés ne transitent jamais vers le renderer : tous les appels réseau (chat, recherche web, test de clé) se font dans le process principal Electron.
+
+## Choix du modèle par fournisseur
+
+Chaque carte de la section **Modèles** expose (via ⚙️) un sélecteur **Modèle** : liste de modèles connus par fournisseur (`src/providers/models.ts`, premier = défaut) **plus saisie libre** d'un id arbitraire. Le modèle retenu est envoyé tel quel à l'API et affiché sur la carte de résultat. Les tarifs restant définis **par fournisseur** (voir ci-dessous), le coût d'un modèle non-défaut est calculé avec la grille du fournisseur : ajuste la ligne dans l'onglet 💰 Tarifs si besoin.
 
 ## Mettre à jour les tarifs
 
@@ -38,6 +43,7 @@ Onglet **💰 Tarifs**. Chaque ligne édite `inputPerM`, `cachedInputPerM`, `out
 - **Kimi K2.6** — outil intégré `builtin_function` `$web_search`, boucle d'outils manuelle (max 8 tours), `thinking` désactivé pendant la recherche, usage **accumulé sur tous les tours** (voir `src/providers/kimi.ts` et `tests/providers/kimi.test.ts`).
 - **GLM‑5.1** — outil natif `web_search` (`search_pro_jina`), pas de boucle manuelle, facturé à l'appel (`webSearchCostPerCall`).
 - **DeepSeek V4 Pro** — l'API Chat Completions publique de DeepSeek n'expose pas de paramètre de recherche web natif documenté au moment de l'écriture (vérifié via `api-docs.deepseek.com`, août 2026). L'app utilise donc un **mode ponté** par défaut (`webSearchMode: 'bridge'`) : une recherche minimale est exécutée via Qwen ou GLM, les sources sont injectées dans le prompt système de DeepSeek sous forme de bloc `<sources>`, et le coût des tokens de la recherche pontée est compté dans le coût DeepSeek. La carte DeepSeek affiche un badge **« recherche : pontée »**. Un mode `native` est prévu dans les réglages si DeepSeek ajoute un paramètre officiel plus tard — mettez à jour `src/providers/deepseek.ts` en conséquence.
+- **ChatGPT (GPT‑5.1)** — la recherche web native d'OpenAI passe par la Responses API (`tools: [{ type: 'web_search' }]`), non couverte par le client Chat Completions partagé. ChatGPT utilise donc le **même mode ponté** que DeepSeek (`webSearchMode: 'bridge'`, fournisseur pont Qwen/GLM réglable), avec le badge **« recherche : pontée »**. Le provider envoie `max_completion_tokens` (et non `max_tokens`) et laisse la température par défaut, GPT‑5.1 n'acceptant que ces valeurs en Chat Completions. La clé du fournisseur pont est résolue dans le process principal (`src/main/runner.ts`).
 
 ## Écarts constatés vs. le prompt de spécification
 

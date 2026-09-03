@@ -8,7 +8,8 @@ const LABELS: Record<ProviderId, string> = {
   deepseek: 'DeepSeek V4 Pro',
   qwen: 'Qwen 3.7 Plus',
   kimi: 'Kimi K2.6',
-  glm: 'GLM-5.1'
+  glm: 'GLM-5.1',
+  chatgpt: 'ChatGPT (GPT-5.1)'
 };
 
 export default function CostSettings(): React.ReactElement {

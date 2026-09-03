@@ -1,19 +1,24 @@
 import React, { useState } from 'react';
 import { useRunStore, PROVIDER_IDS } from '../store/useRunStore.js';
 import type { ProviderId } from '../../providers/types.js';
+import { providerModels } from '../../providers/models.js';
+
+const CUSTOM_MODEL = '__custom__';
 
 const LABELS: Record<ProviderId, string> = {
   deepseek: 'DeepSeek V4 Pro',
   qwen: 'Qwen 3.7 Plus',
   kimi: 'Kimi K2.6',
-  glm: 'GLM-5.1'
+  glm: 'GLM-5.1',
+  chatgpt: 'ChatGPT (GPT-5.1)'
 };
 
 const COLORS: Record<ProviderId, string> = {
   deepseek: 'border-deepseek/50',
   qwen: 'border-qwen/50',
   kimi: 'border-kimi/50',
-  glm: 'border-glm/50'
+  glm: 'border-glm/50',
+  chatgpt: 'border-chatgpt/50'
 };
 
 export default function ModelSelector(): React.ReactElement {
@@ -48,7 +53,10 @@ export default function ModelSelector(): React.ReactElement {
                   ⚙️
                 </button>
               </div>
-              {id === 'deepseek' && ms.webSearch && (
+              <div className="mono mt-0.5 truncate text-[10px] text-slate-500" title={ms.modelId}>
+                {ms.modelId}
+              </div>
+              {(id === 'deepseek' || id === 'chatgpt') && ms.webSearch && (
                 <span className="mt-1 inline-block rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
                   recherche : pontée
                 </span>
@@ -56,6 +64,32 @@ export default function ModelSelector(): React.ReactElement {
 
               {openGear === id && (
                 <div className="mt-2 space-y-2 border-t border-slate-800 pt-2 text-xs">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>Modèle</span>
+                      <select
+                        className="input w-40 py-0.5"
+                        value={providerModels[id].some((m) => m.id === ms.modelId) ? ms.modelId : CUSTOM_MODEL}
+                        onChange={(e) => {
+                          if (e.target.value !== CUSTOM_MODEL) updateModelSettings(id, { modelId: e.target.value });
+                        }}
+                      >
+                        {providerModels[id].map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.label}
+                          </option>
+                        ))}
+                        <option value={CUSTOM_MODEL}>Personnalisé…</option>
+                      </select>
+                    </div>
+                    <input
+                      className="input mono w-full py-0.5 text-[11px]"
+                      value={ms.modelId}
+                      onChange={(e) => updateModelSettings(id, { modelId: e.target.value })}
+                      placeholder="id du modèle (saisie libre)"
+                      spellCheck={false}
+                    />
+                  </div>
                   <label className="flex items-center justify-between gap-2">
                     <span>Recherche web</span>
                     <input
@@ -113,6 +147,20 @@ export default function ModelSelector(): React.ReactElement {
                         </select>
                       </label>
                     </>
+                  )}
+
+                  {id === 'chatgpt' && (
+                    <label className="flex items-center justify-between gap-2">
+                      <span>Fournisseur pont</span>
+                      <select
+                        className="input w-28 py-0.5"
+                        value={(ms.options.bridgeProviderId as string) ?? 'qwen'}
+                        onChange={(e) => updateModelSettings(id, { options: { ...ms.options, bridgeProviderId: e.target.value } })}
+                      >
+                        <option value="qwen">Qwen</option>
+                        <option value="glm">GLM</option>
+                      </select>
+                    </label>
                   )}
 
                   {id === 'qwen' && (

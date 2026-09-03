@@ -84,6 +84,17 @@ export const defaultRates: Record<ProviderId, RateCard> = {
     currency: 'USD',
     lastVerified: '2026-08-24',
     sourceUrl: 'https://docs.z.ai/guides/pricing'
+  },
+  chatgpt: {
+    providerId: 'chatgpt',
+    modelId: 'gpt-5.1',
+    inputPerM: 1.25,
+    cachedInputPerM: 0.125,
+    outputPerM: 10.0,
+    webSearchCostPerCall: 0, // pontée : le coût est déjà porté par le fournisseur de pontage
+    currency: 'USD',
+    lastVerified: '2026-09-03',
+    sourceUrl: 'https://platform.openai.com/docs/pricing'
   }
 };
 

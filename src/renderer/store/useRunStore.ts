@@ -2,7 +2,17 @@ import { create } from 'zustand';
 import type { ProviderId, RunResult, StreamDelta } from '../../providers/types.js';
 import type { RateCard } from '../../pricing/rates.js';
 import { computeCost } from '../../pricing/calculator.js';
-import { RESTAURANT_TEMPLATE } from '../templates/restaurantTemplate.js';
+import { defaultModelId } from '../../providers/models.js';
+import {
+  PROMPT_TEMPLATES,
+  DEFAULT_TEMPLATE_ID,
+  CUSTOM_TEMPLATE_ID,
+  getTemplate,
+  matchTemplateId,
+  type PromptTemplate
+} from '../templates/index.js';
+
+const DEFAULT_TEMPLATE = getTemplate(DEFAULT_TEMPLATE_ID)!.content;
 
 export interface LiveCardState {
   status: 'idle' | 'running' | 'success' | 'error' | 'cancelled';
@@ -18,6 +28,8 @@ export interface LiveCardState {
 export interface ModelSettings {
   enabled: boolean;
   webSearch: boolean;
+  /** id du modèle choisi pour ce fournisseur (vide = modèle par défaut). */
+  modelId: string;
   temperature: number;
   maxTokens: number;
   options: Record<string, unknown>;
@@ -32,15 +44,16 @@ export interface HistoryEntry {
   totalCostUsd: number;
 }
 
-const PROVIDER_IDS: ProviderId[] = ['deepseek', 'qwen', 'kimi', 'glm'];
+const PROVIDER_IDS: ProviderId[] = ['deepseek', 'qwen', 'kimi', 'glm', 'chatgpt'];
 let listenersRegistered = false;
 
 function defaultModelSettings(): Record<ProviderId, ModelSettings> {
   return {
-    deepseek: { enabled: true, webSearch: true, temperature: 1, maxTokens: 4096, options: { webSearchMode: 'bridge', bridgeProviderId: 'qwen' } },
-    qwen: { enabled: true, webSearch: true, temperature: 1, maxTokens: 4096, options: { region: 'intl', searchStrategy: 'agent', forcedSearch: true } },
-    kimi: { enabled: true, webSearch: true, temperature: 1, maxTokens: 4096, options: { region: 'global' } },
-    glm: { enabled: true, webSearch: true, temperature: 1, maxTokens: 4096, options: { searchEngine: 'search_pro_jina', resultCount: 10 } }
+    deepseek: { enabled: true, webSearch: true, modelId: defaultModelId.deepseek, temperature: 1, maxTokens: 4096, options: { webSearchMode: 'bridge', bridgeProviderId: 'qwen' } },
+    qwen: { enabled: true, webSearch: true, modelId: defaultModelId.qwen, temperature: 1, maxTokens: 4096, options: { region: 'intl', searchStrategy: 'agent', forcedSearch: true } },
+    kimi: { enabled: true, webSearch: true, modelId: defaultModelId.kimi, temperature: 1, maxTokens: 4096, options: { region: 'global' } },
+    glm: { enabled: true, webSearch: true, modelId: defaultModelId.glm, temperature: 1, maxTokens: 4096, options: { searchEngine: 'search_pro_jina', resultCount: 10 } },
+    chatgpt: { enabled: true, webSearch: true, modelId: defaultModelId.chatgpt, temperature: 1, maxTokens: 4096, options: { webSearchMode: 'bridge', bridgeProviderId: 'qwen' } }
   };
 }
 
@@ -55,6 +68,9 @@ function fillVariables(prompt: string, variables: Record<string, string>): strin
 
 interface RunStore {
   prompt: string;
+  /** id du template actif, "" si le prompt a été édité/tapé à la main. */
+  selectedTemplateId: string;
+  templates: PromptTemplate[];
   variables: Record<string, string>;
   detectedVariableNames: string[];
   modelSettings: Record<ProviderId, ModelSettings>;
@@ -74,11 +90,12 @@ interface RunStore {
   runsPerDay: number;
 
   setPrompt: (prompt: string) => void;
+  selectTemplate: (id: string) => void;
+  clearPrompt: () => void;
   setVariable: (name: string, value: string) => void;
   toggleModel: (id: ProviderId) => void;
   updateModelSettings: (id: ProviderId, patch: Partial<ModelSettings>) => void;
   setGlobalWebSearch: (value: boolean) => void;
-  loadTemplate: () => void;
   init: () => Promise<void>;
   startRun: () => Promise<void>;
   cancelRun: (providerId?: ProviderId) => Promise<void>;
@@ -105,14 +122,22 @@ function emptyLive(): LiveCardState {
 }
 
 export const useRunStore = create<RunStore>((set, get) => ({
-  prompt: RESTAURANT_TEMPLATE,
-  variables: { nom_restaurant: '', adresse: '', pays: '', date_analyse: new Date().toISOString().slice(0, 10) },
-  detectedVariableNames: extractVariables(RESTAURANT_TEMPLATE),
+  prompt: DEFAULT_TEMPLATE,
+  selectedTemplateId: DEFAULT_TEMPLATE_ID,
+  templates: PROMPT_TEMPLATES,
+  variables: {
+    nom_restaurant: '',
+    adresse: '',
+    pays: '',
+    zone: '44210 PORNIC',
+    date_analyse: new Date().toISOString().slice(0, 10)
+  },
+  detectedVariableNames: extractVariables(DEFAULT_TEMPLATE),
   modelSettings: defaultModelSettings(),
   globalWebSearch: true,
   runId: null,
   isRunning: false,
-  live: { deepseek: emptyLive(), qwen: emptyLive(), kimi: emptyLive(), glm: emptyLive() },
+  live: { deepseek: emptyLive(), qwen: emptyLive(), kimi: emptyLive(), glm: emptyLive(), chatgpt: emptyLive() },
   rates: null,
   usdToEur: 0.92,
   deepseekPricingMode: 'auto',
@@ -124,7 +149,8 @@ export const useRunStore = create<RunStore>((set, get) => ({
   projectionRuns: 100,
   runsPerDay: 20,
 
-  setPrompt: (prompt) => set({ prompt, detectedVariableNames: extractVariables(prompt) }),
+  setPrompt: (prompt) =>
+    set({ prompt, selectedTemplateId: matchTemplateId(prompt), detectedVariableNames: extractVariables(prompt) }),
   setVariable: (name, value) => set((s) => ({ variables: { ...s.variables, [name]: value } })),
   toggleModel: (id) =>
     set((s) => ({ modelSettings: { ...s.modelSettings, [id]: { ...s.modelSettings[id], enabled: !s.modelSettings[id].enabled } } })),
@@ -136,7 +162,12 @@ export const useRunStore = create<RunStore>((set, get) => ({
       for (const id of PROVIDER_IDS) modelSettings[id] = { ...modelSettings[id], webSearch: value };
       return { globalWebSearch: value, modelSettings };
     }),
-  loadTemplate: () => set({ prompt: RESTAURANT_TEMPLATE, detectedVariableNames: extractVariables(RESTAURANT_TEMPLATE) }),
+  selectTemplate: (id) => {
+    const tpl = getTemplate(id);
+    if (!tpl) return;
+    set({ prompt: tpl.content, selectedTemplateId: tpl.id, detectedVariableNames: extractVariables(tpl.content) });
+  },
+  clearPrompt: () => set({ prompt: '', selectedTemplateId: CUSTOM_TEMPLATE_ID, detectedVariableNames: [] }),
 
   init: async () => {
     if (listenersRegistered) return;
@@ -157,7 +188,12 @@ export const useRunStore = create<RunStore>((set, get) => ({
       theme: (settings.theme as 'dark' | 'light') ?? 'dark'
     });
     if (promptState.prompt) {
-      set({ prompt: promptState.prompt, variables: promptState.variables, detectedVariableNames: extractVariables(promptState.prompt) });
+      set({
+        prompt: promptState.prompt,
+        selectedTemplateId: matchTemplateId(promptState.prompt),
+        variables: promptState.variables,
+        detectedVariableNames: extractVariables(promptState.prompt)
+      });
     }
     document.documentElement.classList.toggle('dark', get().theme === 'dark');
 
@@ -221,9 +257,9 @@ export const useRunStore = create<RunStore>((set, get) => ({
     const filledPrompt = fillVariables(s.prompt, s.variables);
     const models = PROVIDER_IDS.filter((id) => s.modelSettings[id].enabled).map((id) => {
       const ms = s.modelSettings[id];
-      return { providerId: id, webSearch: ms.webSearch, temperature: ms.temperature, maxTokens: ms.maxTokens, options: ms.options };
+      return { providerId: id, modelId: ms.modelId, webSearch: ms.webSearch, temperature: ms.temperature, maxTokens: ms.maxTokens, options: ms.options };
     });
-    const live: Record<ProviderId, LiveCardState> = { deepseek: emptyLive(), qwen: emptyLive(), kimi: emptyLive(), glm: emptyLive() };
+    const live: Record<ProviderId, LiveCardState> = { deepseek: emptyLive(), qwen: emptyLive(), kimi: emptyLive(), glm: emptyLive(), chatgpt: emptyLive() };
     for (const m of models) live[m.providerId] = { ...emptyLive(), status: 'running', startedAt: Date.now() };
     set({ live, isRunning: true });
     const runId = await window.chinallm.run.start({ prompt: filledPrompt, models });
@@ -245,7 +281,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
     set((state) => ({ live: { ...state.live, [providerId]: { ...emptyLive(), status: 'running', startedAt: Date.now() } }, isRunning: true }));
     const runId = await window.chinallm.run.start({
       prompt: filledPrompt,
-      models: [{ providerId, webSearch: ms.webSearch, temperature: ms.temperature, maxTokens: ms.maxTokens, options: ms.options }]
+      models: [{ providerId, modelId: ms.modelId, webSearch: ms.webSearch, temperature: ms.temperature, maxTokens: ms.maxTokens, options: ms.options }]
     });
     set({ runId });
   },
@@ -296,7 +332,12 @@ export const useRunStore = create<RunStore>((set, get) => ({
     await get().refreshHistory();
   },
   replayHistoryEntry: (entry) => {
-    set({ prompt: entry.prompt, variables: entry.variables, detectedVariableNames: extractVariables(entry.prompt) });
+    set({
+      prompt: entry.prompt,
+      selectedTemplateId: matchTemplateId(entry.prompt),
+      variables: entry.variables,
+      detectedVariableNames: extractVariables(entry.prompt)
+    });
   },
 
   setProjectionRuns: (n) => set({ projectionRuns: n }),

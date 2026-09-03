@@ -2,9 +2,9 @@ import type { Provider, RunRequest, RunResult, TokenUsage } from './types.js';
 import { emptyUsage } from './types.js';
 import { mapCommonUsage, streamChatCompletion, ProviderHttpError, type ChatMessage, type ChatCompletionBody } from './base.js';
 import { estimateTokens } from '../pricing/tokenizer.js';
+import { providerModels, defaultModelId, resolveModelId } from './models.js';
 
 const BASE_URL = 'https://api.z.ai/api/paas/v4';
-const MODEL_ID = 'glm-5.1';
 
 export interface GlmOptions {
   searchEngine?: string;
@@ -20,10 +20,12 @@ interface GlmSearchResultItem {
 export const glmProvider: Provider = {
   id: 'glm',
   label: 'GLM-5.1',
-  defaultModelId: MODEL_ID,
+  defaultModelId: defaultModelId.glm,
+  models: providerModels.glm,
 
   async run(req: RunRequest, apiKey: string): Promise<RunResult> {
     const start = Date.now();
+    const modelId = resolveModelId('glm', req.modelId);
     const options = (req.options ?? {}) as GlmOptions;
     let ttftMs: number | undefined;
 
@@ -33,7 +35,7 @@ export const glmProvider: Provider = {
 
     try {
       const body: ChatCompletionBody = {
-        model: MODEL_ID,
+        model: modelId,
         messages,
         temperature: req.temperature ?? 1,
         max_tokens: req.maxTokens ?? 4096
@@ -81,7 +83,7 @@ export const glmProvider: Provider = {
 
       return {
         providerId: 'glm',
-        modelId: MODEL_ID,
+        modelId,
         status: 'success',
         content: result.content,
         reasoningContent: result.reasoningContent || undefined,
@@ -94,8 +96,8 @@ export const glmProvider: Provider = {
         rawResponse: result.raw
       };
     } catch (err) {
-      if (req.signal.aborted) return cancelledResult(start);
-      return errorResult(err, start);
+      if (req.signal.aborted) return cancelledResult(modelId, start);
+      return errorResult(modelId, err, start);
     }
   },
 
@@ -104,7 +106,7 @@ export const glmProvider: Provider = {
       const res = await fetch(`${BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: MODEL_ID, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 })
+        body: JSON.stringify({ model: defaultModelId.glm, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 })
       });
       return res.ok;
     } catch {
@@ -128,10 +130,10 @@ function extractSources(raw: unknown[]): RunResult['sources'] {
   return [];
 }
 
-function cancelledResult(start: number): RunResult {
+function cancelledResult(modelId: string, start: number): RunResult {
   return {
     providerId: 'glm',
-    modelId: MODEL_ID,
+    modelId,
     status: 'cancelled',
     content: '',
     sources: [],
@@ -144,12 +146,12 @@ function cancelledResult(start: number): RunResult {
   };
 }
 
-function errorResult(err: unknown, start: number): RunResult {
+function errorResult(modelId: string, err: unknown, start: number): RunResult {
   const code = err instanceof ProviderHttpError ? err.code : 'network_error';
   const message = err instanceof Error ? err.message : String(err);
   return {
     providerId: 'glm',
-    modelId: MODEL_ID,
+    modelId,
     status: 'error',
     content: '',
     sources: [],

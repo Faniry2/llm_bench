@@ -2,10 +2,10 @@ import type { Provider, RunRequest, RunResult, TokenUsage } from './types.js';
 import { emptyUsage } from './types.js';
 import { mapCommonUsage, streamChatCompletion, ProviderHttpError, type ChatMessage, type ChatCompletionBody } from './base.js';
 import { estimateTokens } from '../pricing/tokenizer.js';
+import { providerModels, defaultModelId, resolveModelId } from './models.js';
 
 const BASE_URL_INTL = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
 const BASE_URL_CN = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-const MODEL_ID = 'qwen3.7-plus';
 
 export interface QwenOptions {
   region?: 'intl' | 'cn';
@@ -24,10 +24,12 @@ interface QwenSearchResult {
 export const qwenProvider: Provider = {
   id: 'qwen',
   label: 'Qwen 3.7 Plus',
-  defaultModelId: MODEL_ID,
+  defaultModelId: defaultModelId.qwen,
+  models: providerModels.qwen,
 
   async run(req: RunRequest, apiKey: string): Promise<RunResult> {
     const start = Date.now();
+    const modelId = resolveModelId('qwen', req.modelId);
     const options = (req.options ?? {}) as QwenOptions;
     const baseUrl = options.region === 'cn' ? BASE_URL_CN : BASE_URL_INTL;
     let ttftMs: number | undefined;
@@ -38,7 +40,7 @@ export const qwenProvider: Provider = {
 
     try {
       const body: ChatCompletionBody = {
-        model: MODEL_ID,
+        model: modelId,
         messages,
         temperature: req.temperature ?? 1,
         max_tokens: req.maxTokens ?? 4096
@@ -85,7 +87,7 @@ export const qwenProvider: Provider = {
 
       return {
         providerId: 'qwen',
-        modelId: MODEL_ID,
+        modelId,
         status: 'success',
         content: result.content,
         reasoningContent: result.reasoningContent || undefined,
@@ -98,8 +100,8 @@ export const qwenProvider: Provider = {
         rawResponse: result.raw
       };
     } catch (err) {
-      if (req.signal.aborted) return cancelledResult(start);
-      return errorResult(err, start);
+      if (req.signal.aborted) return cancelledResult(modelId, start);
+      return errorResult(modelId, err, start);
     }
   },
 
@@ -108,7 +110,7 @@ export const qwenProvider: Provider = {
       const res = await fetch(`${BASE_URL_INTL}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: MODEL_ID, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 })
+        body: JSON.stringify({ model: defaultModelId.qwen, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 })
       });
       return res.ok;
     } catch {
@@ -132,10 +134,10 @@ function extractSources(raw: unknown[]): RunResult['sources'] {
   return [];
 }
 
-function cancelledResult(start: number): RunResult {
+function cancelledResult(modelId: string, start: number): RunResult {
   return {
     providerId: 'qwen',
-    modelId: MODEL_ID,
+    modelId,
     status: 'cancelled',
     content: '',
     sources: [],
@@ -148,12 +150,12 @@ function cancelledResult(start: number): RunResult {
   };
 }
 
-function errorResult(err: unknown, start: number): RunResult {
+function errorResult(modelId: string, err: unknown, start: number): RunResult {
   const code = err instanceof ProviderHttpError ? err.code : 'network_error';
   const message = err instanceof Error ? err.message : String(err);
   return {
     providerId: 'qwen',
-    modelId: MODEL_ID,
+    modelId,
     status: 'error',
     content: '',
     sources: [],

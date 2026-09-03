@@ -1,9 +1,11 @@
-export type ProviderId = 'deepseek' | 'qwen' | 'kimi' | 'glm';
+export type ProviderId = 'deepseek' | 'qwen' | 'kimi' | 'glm' | 'chatgpt';
 
 export interface RunRequest {
   prompt: string;
   system?: string;
   webSearch: boolean;
+  /** id du modèle à utiliser ; si absent, le fournisseur prend son modèle par défaut. */
+  modelId?: string;
   maxTokens?: number;
   temperature?: number;
   signal: AbortSignal;
@@ -50,6 +52,8 @@ export interface Provider {
   id: ProviderId;
   label: string;
   defaultModelId: string;
+  /** Modèles proposés dans l'UI (le premier est le défaut ; saisie libre autorisée). */
+  models: { id: string; label: string }[];
   run(req: RunRequest, apiKey: string): Promise<RunResult>;
   testKey(apiKey: string): Promise<boolean>;
 }

@@ -6,21 +6,24 @@ const LABELS: Record<ProviderId, string> = {
   deepseek: 'DeepSeek V4 Pro',
   qwen: 'Qwen 3.7 Plus',
   kimi: 'Kimi K2.6',
-  glm: 'GLM-5.1'
+  glm: 'GLM-5.1',
+  chatgpt: 'ChatGPT (GPT-5.1)'
 };
 
 const ENV_VARS: Record<ProviderId, string> = {
   deepseek: 'DEEPSEEK_API_KEY',
   qwen: 'DASHSCOPE_API_KEY',
   kimi: 'MOONSHOT_API_KEY',
-  glm: 'ZAI_API_KEY'
+  glm: 'ZAI_API_KEY',
+  chatgpt: 'OPENAI_API_KEY'
 };
 
 const PLATFORM_HINTS: Record<ProviderId, string> = {
   deepseek: 'DeepSeek Platform (platform.deepseek.com)',
   qwen: 'Alibaba Cloud Model Studio / DashScope (dashscope.console.aliyun.com)',
   kimi: 'Moonshot AI Platform (platform.moonshot.ai)',
-  glm: 'Z.ai Open Platform (z.ai)'
+  glm: 'Z.ai Open Platform (z.ai)',
+  chatgpt: 'OpenAI Platform (platform.openai.com)'
 };
 
 export default function ApiKeysPanel(): React.ReactElement {

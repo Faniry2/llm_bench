@@ -22,14 +22,16 @@ const LABELS: Record<ProviderId, string> = {
   deepseek: 'DeepSeek',
   qwen: 'Qwen',
   kimi: 'Kimi',
-  glm: 'GLM'
+  glm: 'GLM',
+  chatgpt: 'ChatGPT'
 };
 
 const COLORS: Record<ProviderId, string> = {
   deepseek: '#4f8cff',
   qwen: '#7c5cff',
   kimi: '#ff8a4f',
-  glm: '#2fd18f'
+  glm: '#2fd18f',
+  chatgpt: '#10a37f'
 };
 
 function downloadFile(name: string, content: string, mime: string) {

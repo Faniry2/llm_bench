@@ -5,24 +5,30 @@ import { estimateTokens } from '../pricing/tokenizer.js';
 import { runSearchOnlyBridge } from './search-bridge.js';
 import { providerModels, defaultModelId, resolveModelId } from './models.js';
 
-const BASE_URL = 'https://api.deepseek.com/v1';
+const BASE_URL = 'https://api.openai.com/v1';
 
-export interface DeepseekOptions {
+export interface ChatgptOptions {
+  /**
+   * OpenAI expose une recherche web native uniquement via la Responses API
+   * (`tools: [{ type: 'web_search' }]`), non couverte par le client Chat
+   * Completions partagé de cette app. On garde donc le même schéma que DeepSeek :
+   * mode `bridge` (recherche via Qwen/GLM, sources injectées dans le prompt système).
+   */
   webSearchMode?: 'native' | 'bridge';
   bridgeProviderApiKey?: string;
   bridgeProviderId?: 'qwen' | 'glm';
 }
 
-export const deepseekProvider: Provider = {
-  id: 'deepseek',
-  label: 'DeepSeek V4 Pro',
-  defaultModelId: defaultModelId.deepseek,
-  models: providerModels.deepseek,
+export const chatgptProvider: Provider = {
+  id: 'chatgpt',
+  label: 'ChatGPT (GPT-5.1)',
+  defaultModelId: defaultModelId.chatgpt,
+  models: providerModels.chatgpt,
 
   async run(req: RunRequest, apiKey: string): Promise<RunResult> {
     const start = Date.now();
-    const modelId = resolveModelId('deepseek', req.modelId);
-    const options = (req.options ?? {}) as DeepseekOptions;
+    const modelId = resolveModelId('chatgpt', req.modelId);
+    const options = (req.options ?? {}) as ChatgptOptions;
     const mode = options.webSearchMode ?? 'bridge';
     let usage: TokenUsage = emptyUsage();
     let sources: RunResult['sources'] = [];
@@ -31,21 +37,20 @@ export const deepseekProvider: Provider = {
     let ttftMs: number | undefined;
 
     try {
-      if (req.webSearch) {
-        if (mode === 'bridge') {
-          webSearchBridged = true;
-          const bridge = await runSearchOnlyBridge(req.prompt, options.bridgeProviderId ?? 'qwen', options.bridgeProviderApiKey, req.signal);
-          usage = addUsage(usage, bridge.usage);
-          sources = bridge.sources;
-          const sourcesBlock = sources
-            .map((s, i) => `[${i + 1}] ${s.title} — ${s.url}${s.snippet ? `\n${s.snippet}` : ''}`)
-            .join('\n\n');
-          systemPrompt = `${systemPrompt}\n\n<sources>\n${sourcesBlock || 'Aucune source trouvée.'}\n</sources>\n\nUtilise ces sources récentes pour répondre. Cite-les si pertinent.`;
-        }
-        // mode 'native': DeepSeek's public Chat Completions API does not expose a
-        // documented server-side web_search tool as of writing (see README). We
-        // still send the request normally; if DeepSeek adds a native flag later,
-        // set it here once confirmed in https://api-docs.deepseek.com.
+      if (req.webSearch && mode === 'bridge') {
+        webSearchBridged = true;
+        const bridge = await runSearchOnlyBridge(
+          req.prompt,
+          options.bridgeProviderId ?? 'qwen',
+          options.bridgeProviderApiKey,
+          req.signal
+        );
+        usage = addUsage(usage, bridge.usage);
+        sources = bridge.sources;
+        const sourcesBlock = sources
+          .map((s, i) => `[${i + 1}] ${s.title} — ${s.url}${s.snippet ? `\n${s.snippet}` : ''}`)
+          .join('\n\n');
+        systemPrompt = `${systemPrompt}\n\n<sources>\n${sourcesBlock || 'Aucune source trouvée.'}\n</sources>\n\nUtilise ces sources récentes pour répondre. Cite-les si pertinent.`;
       }
 
       const messages: ChatMessage[] = [];
@@ -59,8 +64,10 @@ export const deepseekProvider: Provider = {
         body: {
           model: modelId,
           messages,
-          temperature: req.temperature ?? 1,
-          max_tokens: req.maxTokens ?? 4096
+          // GPT-5.x en Chat Completions n'accepte que la température par défaut (1)
+          // et remplace `max_tokens` par `max_completion_tokens` (accepté aussi par
+          // gpt-4.1 / gpt-4o, donc pas de branche par modèle).
+          max_completion_tokens: req.maxTokens ?? 4096
         },
         callbacks: {
           onFirstToken: () => {
@@ -81,7 +88,7 @@ export const deepseekProvider: Provider = {
       usage = addUsage(usage, chatUsage);
 
       return {
-        providerId: 'deepseek',
+        providerId: 'chatgpt',
         modelId,
         status: 'success',
         content: result.content,
@@ -105,10 +112,8 @@ export const deepseekProvider: Provider = {
 
   async testKey(apiKey: string): Promise<boolean> {
     try {
-      const res = await fetch(`${BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: defaultModelId.deepseek, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 })
+      const res = await fetch(`${BASE_URL}/models`, {
+        headers: { Authorization: `Bearer ${apiKey}` }
       });
       return res.ok;
     } catch {
@@ -125,7 +130,7 @@ function cancelledResult(
   webSearchBridged: boolean
 ): RunResult {
   return {
-    providerId: 'deepseek',
+    providerId: 'chatgpt',
     modelId,
     status: 'cancelled',
     content: '',
@@ -151,7 +156,7 @@ function errorResult(
   const code = err instanceof ProviderHttpError ? err.code : 'network_error';
   const message = err instanceof Error ? err.message : String(err);
   return {
-    providerId: 'deepseek',
+    providerId: 'chatgpt',
     modelId,
     status: 'error',
     content: '',

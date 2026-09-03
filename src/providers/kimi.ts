@@ -2,10 +2,10 @@ import type { Provider, RunRequest, RunResult, TokenUsage } from './types.js';
 import { emptyUsage, addUsage } from './types.js';
 import { mapCommonUsage, streamChatCompletion, ProviderHttpError, type ChatMessage, type ToolCall, type ChatCompletionBody } from './base.js';
 import { estimateTokens } from '../pricing/tokenizer.js';
+import { providerModels, defaultModelId, resolveModelId } from './models.js';
 
 const BASE_URL_GLOBAL = 'https://api.moonshot.ai/v1';
 const BASE_URL_CN = 'https://api.moonshot.cn/v1';
-const MODEL_ID = 'kimi-k2.6';
 const MAX_ROUNDS = 8;
 
 export interface KimiOptions {
@@ -17,10 +17,12 @@ const WEB_SEARCH_TOOL = { type: 'builtin_function', function: { name: '$web_sear
 export const kimiProvider: Provider = {
   id: 'kimi',
   label: 'Kimi K2.6',
-  defaultModelId: MODEL_ID,
+  defaultModelId: defaultModelId.kimi,
+  models: providerModels.kimi,
 
   async run(req: RunRequest, apiKey: string): Promise<RunResult> {
     const start = Date.now();
+    const modelId = resolveModelId('kimi', req.modelId);
     const options = (req.options ?? {}) as KimiOptions;
     const baseUrl = options.region === 'cn' ? BASE_URL_CN : BASE_URL_GLOBAL;
     let ttftMs: number | undefined;
@@ -42,7 +44,7 @@ export const kimiProvider: Provider = {
         req.onDelta?.({ type: 'round', round: rounds });
 
         const body: ChatCompletionBody = {
-          model: MODEL_ID,
+          model: modelId,
           messages,
           temperature: req.temperature ?? 1,
           max_tokens: req.maxTokens ?? 4096
@@ -110,7 +112,7 @@ export const kimiProvider: Provider = {
 
       return {
         providerId: 'kimi',
-        modelId: MODEL_ID,
+        modelId,
         status: 'success',
         content: finalContent,
         reasoningContent: finalReasoning || undefined,
@@ -126,7 +128,7 @@ export const kimiProvider: Provider = {
       if (req.signal.aborted) {
         return {
           providerId: 'kimi',
-          modelId: MODEL_ID,
+          modelId,
           status: 'cancelled',
           content: '',
           sources,
@@ -142,7 +144,7 @@ export const kimiProvider: Provider = {
       const message = err instanceof Error ? err.message : String(err);
       return {
         providerId: 'kimi',
-        modelId: MODEL_ID,
+        modelId,
         status: 'error',
         content: '',
         sources,
@@ -161,7 +163,7 @@ export const kimiProvider: Provider = {
       const res = await fetch(`${BASE_URL_GLOBAL}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: MODEL_ID, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 })
+        body: JSON.stringify({ model: defaultModelId.kimi, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 })
       });
       return res.ok;
     } catch {

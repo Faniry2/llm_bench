@@ -69,7 +69,9 @@ export function hasApiKey(providerId: ProviderId): boolean {
 }
 
 export function getRates(): Record<ProviderId, RateCard> {
-  return store.get('rates');
+  // Merge over defaults so a provider added after the store was first written
+  // (e.g. chatgpt) still has a rate card instead of being undefined.
+  return { ...defaultRates, ...store.get('rates') };
 }
 
 export function setRates(rates: Record<ProviderId, RateCard>): void {

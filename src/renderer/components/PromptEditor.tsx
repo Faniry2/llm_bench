@@ -4,10 +4,13 @@ import { useRunStore } from '../store/useRunStore.js';
 export default function PromptEditor(): React.ReactElement {
   const prompt = useRunStore((s) => s.prompt);
   const setPrompt = useRunStore((s) => s.setPrompt);
+  const templates = useRunStore((s) => s.templates);
+  const selectedTemplateId = useRunStore((s) => s.selectedTemplateId);
+  const selectTemplate = useRunStore((s) => s.selectTemplate);
+  const clearPrompt = useRunStore((s) => s.clearPrompt);
   const detectedVariableNames = useRunStore((s) => s.detectedVariableNames);
   const variables = useRunStore((s) => s.variables);
   const setVariable = useRunStore((s) => s.setVariable);
-  const loadTemplate = useRunStore((s) => s.loadTemplate);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function saveAsTemplate() {
@@ -31,18 +34,35 @@ export default function PromptEditor(): React.ReactElement {
 
   return (
     <div className="card p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-300">Prompt</h2>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-slate-300">Prompt</h2>
+          <select
+            className="input py-1 text-xs"
+            value={selectedTemplateId}
+            onChange={(e) => {
+              if (e.target.value) selectTemplate(e.target.value);
+            }}
+            title="Choisir un modèle de prompt"
+          >
+            {selectedTemplateId === '' && <option value="">— Personnalisé —</option>}
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="flex gap-2">
-          <button className="btn-sm" onClick={loadTemplate}>
-            📄 Charger le template restaurant
+          <button className="btn-sm" onClick={clearPrompt} title="Repartir d'un prompt vide">
+            ✏️ Nouveau
           </button>
           <button className="btn-sm" onClick={() => fileInputRef.current?.click()}>
-            📂 Charger un template
+            📂 Charger un fichier
           </button>
           <input ref={fileInputRef} type="file" accept=".md,.txt" className="hidden" onChange={onFileChosen} />
           <button className="btn-sm" onClick={saveAsTemplate}>
-            💾 Enregistrer comme template
+            💾 Enregistrer
           </button>
         </div>
       </div>

@@ -10,7 +10,8 @@ const LABELS: Record<ProviderId, string> = {
   deepseek: 'DeepSeek V4 Pro',
   qwen: 'Qwen 3.7 Plus',
   kimi: 'Kimi K2.6',
-  glm: 'GLM-5.1'
+  glm: 'GLM-5.1',
+  chatgpt: 'ChatGPT (GPT-5.1)'
 };
 
 type Tab = 'text' | 'html' | 'sources' | 'json';
@@ -90,6 +91,11 @@ export default function ResultCard({ providerId }: { providerId: ProviderId }): 
       <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
         <div className="flex items-center gap-2 text-sm font-medium">
           <span>{LABELS[providerId]}</span>
+          {card.result?.modelId && (
+            <span className="mono rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-normal text-slate-400">
+              {card.result.modelId}
+            </span>
+          )}
           {statusBadge(card.status)}
           {card.result?.webSearchBridged && (
             <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-300">pontée</span>

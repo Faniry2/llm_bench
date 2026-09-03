@@ -7,6 +7,7 @@ import { appendRunLog } from './logger.js';
 
 export interface ModelRunConfig {
   providerId: ProviderId;
+  modelId?: string;
   webSearch: boolean;
   temperature?: number;
   maxTokens?: number;
@@ -42,7 +43,7 @@ export function startRun(sender: WebContents, req: StartRunRequest): string {
     if (!apiKey) {
       const result: RunResult = {
         providerId: model.providerId,
-        modelId: provider.defaultModelId,
+        modelId: model.modelId ?? provider.defaultModelId,
         status: 'error',
         content: '',
         sources: [],
@@ -57,16 +58,26 @@ export function startRun(sender: WebContents, req: StartRunRequest): string {
       return result;
     }
 
+    // Bridged web search (deepseek, chatgpt): resolve the bridge provider's key
+    // in the main process so the renderer never has to hold it.
+    const options: Record<string, unknown> = { ...model.options };
+    if (options.webSearchMode === 'bridge' && !options.bridgeProviderApiKey) {
+      const bridgeId = (options.bridgeProviderId as ProviderId) ?? 'qwen';
+      const bridgeKey = getApiKey(bridgeId);
+      if (bridgeKey) options.bridgeProviderApiKey = bridgeKey;
+    }
+
     try {
       const result = await provider.run(
         {
           prompt: req.prompt,
           system: req.system,
           webSearch: model.webSearch,
+          modelId: model.modelId,
           temperature: model.temperature,
           maxTokens: model.maxTokens,
           signal: controller.signal,
-          options: model.options,
+          options,
           onDelta: (delta: StreamDelta) => {
             sender.send('run:delta', { runId, providerId: model.providerId, delta });
           }
@@ -80,7 +91,7 @@ export function startRun(sender: WebContents, req: StartRunRequest): string {
       const message = err instanceof Error ? err.message : String(err);
       const result: RunResult = {
         providerId: model.providerId,
-        modelId: provider.defaultModelId,
+        modelId: model.modelId ?? provider.defaultModelId,
         status: 'error',
         content: '',
         sources: [],
