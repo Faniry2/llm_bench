@@ -153,11 +153,11 @@ describe('chatgptProvider bridge mode', () => {
     expect(result.usage.outputTokens).toBe(48);
     expect(result.usage.cachedInputTokens).toBe(10);
 
-    // second HTTP call is the OpenAI chat completion with GPT-5.1 params
+    // second HTTP call is the OpenAI chat completion with the default model params
     const chatBody = JSON.parse(fetchMock.mock.calls[1][1].body as string);
     expect(fetchMock.mock.calls[1][0]).toBe('https://api.openai.com/v1/chat/completions');
-    expect(chatBody.model).toBe('gpt-5.1');
-    expect(chatBody.max_completion_tokens).toBe(4096);
+    expect(chatBody.model).toBe('gpt-5.6-luna');
+    expect(chatBody.max_completion_tokens).toBe(8192);
     expect(chatBody.max_tokens).toBeUndefined();
   });
 

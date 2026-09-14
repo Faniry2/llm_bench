@@ -56,11 +56,13 @@ export default function ModelSelector(): React.ReactElement {
               <div className="mono mt-0.5 truncate text-[10px] text-slate-500" title={ms.modelId}>
                 {ms.modelId}
               </div>
-              {(id === 'deepseek' || id === 'chatgpt') && ms.webSearch && (
-                <span className="mt-1 inline-block rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
-                  recherche : pontée
-                </span>
-              )}
+              {(id === 'deepseek' || id === 'chatgpt') &&
+                ms.webSearch &&
+                (id === 'deepseek' ? (ms.options.webSearchMode as string) ?? 'bridge' : (ms.options.webSearchMode as string) ?? 'native') === 'bridge' && (
+                  <span className="mt-1 inline-block rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+                    recherche : pontée
+                  </span>
+                )}
 
               {openGear === id && (
                 <div className="mt-2 space-y-2 border-t border-slate-800 pt-2 text-xs">
@@ -150,17 +152,32 @@ export default function ModelSelector(): React.ReactElement {
                   )}
 
                   {id === 'chatgpt' && (
-                    <label className="flex items-center justify-between gap-2">
-                      <span>Fournisseur pont</span>
-                      <select
-                        className="input w-28 py-0.5"
-                        value={(ms.options.bridgeProviderId as string) ?? 'qwen'}
-                        onChange={(e) => updateModelSettings(id, { options: { ...ms.options, bridgeProviderId: e.target.value } })}
-                      >
-                        <option value="qwen">Qwen</option>
-                        <option value="glm">GLM</option>
-                      </select>
-                    </label>
+                    <>
+                      <label className="flex items-center justify-between gap-2">
+                        <span>Mode recherche</span>
+                        <select
+                          className="input w-28 py-0.5"
+                          value={(ms.options.webSearchMode as string) ?? 'native'}
+                          onChange={(e) => updateModelSettings(id, { options: { ...ms.options, webSearchMode: e.target.value } })}
+                        >
+                          <option value="native">native</option>
+                          <option value="bridge">bridge</option>
+                        </select>
+                      </label>
+                      {((ms.options.webSearchMode as string) ?? 'native') === 'bridge' && (
+                        <label className="flex items-center justify-between gap-2">
+                          <span>Fournisseur pont</span>
+                          <select
+                            className="input w-28 py-0.5"
+                            value={(ms.options.bridgeProviderId as string) ?? 'qwen'}
+                            onChange={(e) => updateModelSettings(id, { options: { ...ms.options, bridgeProviderId: e.target.value } })}
+                          >
+                            <option value="qwen">Qwen</option>
+                            <option value="glm">GLM</option>
+                          </select>
+                        </label>
+                      )}
+                    </>
                   )}
 
                   {id === 'qwen' && (

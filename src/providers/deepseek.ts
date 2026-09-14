@@ -60,7 +60,7 @@ export const deepseekProvider: Provider = {
           model: modelId,
           messages,
           temperature: req.temperature ?? 1,
-          max_tokens: req.maxTokens ?? 4096
+          max_tokens: req.maxTokens ?? 8192
         },
         callbacks: {
           onFirstToken: () => {

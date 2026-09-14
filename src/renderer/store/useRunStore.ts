@@ -49,11 +49,11 @@ let listenersRegistered = false;
 
 function defaultModelSettings(): Record<ProviderId, ModelSettings> {
   return {
-    deepseek: { enabled: true, webSearch: true, modelId: defaultModelId.deepseek, temperature: 1, maxTokens: 4096, options: { webSearchMode: 'bridge', bridgeProviderId: 'qwen' } },
-    qwen: { enabled: true, webSearch: true, modelId: defaultModelId.qwen, temperature: 1, maxTokens: 4096, options: { region: 'intl', searchStrategy: 'agent', forcedSearch: true } },
-    kimi: { enabled: true, webSearch: true, modelId: defaultModelId.kimi, temperature: 1, maxTokens: 4096, options: { region: 'global' } },
-    glm: { enabled: true, webSearch: true, modelId: defaultModelId.glm, temperature: 1, maxTokens: 4096, options: { searchEngine: 'search_pro_jina', resultCount: 10 } },
-    chatgpt: { enabled: true, webSearch: true, modelId: defaultModelId.chatgpt, temperature: 1, maxTokens: 4096, options: { webSearchMode: 'bridge', bridgeProviderId: 'qwen' } }
+    deepseek: { enabled: true, webSearch: true, modelId: defaultModelId.deepseek, temperature: 1, maxTokens: 8192, options: { webSearchMode: 'bridge', bridgeProviderId: 'qwen' } },
+    qwen: { enabled: true, webSearch: true, modelId: defaultModelId.qwen, temperature: 1, maxTokens: 8192, options: { region: 'intl', searchStrategy: 'agent', forcedSearch: true } },
+    kimi: { enabled: true, webSearch: true, modelId: defaultModelId.kimi, temperature: 1, maxTokens: 8192, options: { region: 'global' } },
+    glm: { enabled: true, webSearch: true, modelId: defaultModelId.glm, temperature: 1, maxTokens: 8192, options: { searchEngine: 'search_pro_jina', resultCount: 10 } },
+    chatgpt: { enabled: true, webSearch: true, modelId: defaultModelId.chatgpt, temperature: 1, maxTokens: 8192, options: { webSearchMode: 'native', bridgeProviderId: 'qwen' } }
   };
 }
 

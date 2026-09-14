@@ -17,6 +17,7 @@ export const providerModels: Record<ProviderId, ModelOption[]> = {
     { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner' }
   ],
   qwen: [
+    { id: 'qwen3.8-max', label: 'Qwen 3.8 Max' },
     { id: 'qwen3.7-plus', label: 'Qwen 3.7 Plus' },
     { id: 'qwen3.7-max', label: 'Qwen 3.7 Max' },
     { id: 'qwen3.7-turbo', label: 'Qwen 3.7 Turbo' }
@@ -32,6 +33,7 @@ export const providerModels: Record<ProviderId, ModelOption[]> = {
     { id: 'glm-4-plus', label: 'GLM-4 Plus' }
   ],
   chatgpt: [
+    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna' },
     { id: 'gpt-5.1', label: 'GPT-5.1' },
     { id: 'gpt-5.1-mini', label: 'GPT-5.1 mini' },
     { id: 'gpt-5', label: 'GPT-5' },

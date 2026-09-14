@@ -9,14 +9,30 @@ const BASE_URL = 'https://api.openai.com/v1';
 
 export interface ChatgptOptions {
   /**
-   * OpenAI expose une recherche web native uniquement via la Responses API
-   * (`tools: [{ type: 'web_search' }]`), non couverte par le client Chat
-   * Completions partagé de cette app. On garde donc le même schéma que DeepSeek :
-   * mode `bridge` (recherche via Qwen/GLM, sources injectées dans le prompt système).
+   * Recherche web côté OpenAI : `native` utilise l'outil `web_search` de la
+   * Responses API (`POST /v1/responses`), `bridge` réutilise l'ancien
+   * contournement (recherche via Qwen/GLM, sources injectées dans le prompt
+   * système) pour les cas où la Responses API n'est pas disponible.
    */
   webSearchMode?: 'native' | 'bridge';
   bridgeProviderApiKey?: string;
   bridgeProviderId?: 'qwen' | 'glm';
+}
+
+interface ResponsesUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  total_tokens?: number;
+  input_tokens_details?: { cached_tokens?: number };
+  output_tokens_details?: { reasoning_tokens?: number };
+}
+
+interface ResponsesStreamResult {
+  content: string;
+  usage?: ResponsesUsage;
+  sources: RunResult['sources'];
+  webSearchCalls: number;
+  raw: unknown[];
 }
 
 export const chatgptProvider: Provider = {
@@ -29,14 +45,58 @@ export const chatgptProvider: Provider = {
     const start = Date.now();
     const modelId = resolveModelId('chatgpt', req.modelId);
     const options = (req.options ?? {}) as ChatgptOptions;
-    const mode = options.webSearchMode ?? 'bridge';
+    const mode = options.webSearchMode ?? 'native';
     let usage: TokenUsage = emptyUsage();
     let sources: RunResult['sources'] = [];
     let webSearchBridged = false;
-    let systemPrompt = req.system ?? '';
     let ttftMs: number | undefined;
 
     try {
+      if (req.webSearch && mode === 'native') {
+        const result = await streamResponsesApi({
+          apiKey,
+          signal: req.signal,
+          body: {
+            model: modelId,
+            input: req.prompt,
+            instructions: req.system || undefined,
+            tools: [{ type: 'web_search' }],
+            max_output_tokens: req.maxTokens ?? 8192
+          },
+          onFirstToken: () => {
+            if (ttftMs === undefined) ttftMs = Date.now() - start;
+          },
+          onContent: (delta) => req.onDelta?.({ type: 'content', text: delta })
+        });
+
+        usage = mapResponsesUsage(result.usage);
+        let usageIsEstimated = false;
+        if (!result.usage) {
+          usageIsEstimated = true;
+          usage.inputTokens = estimateTokens(`${req.system ?? ''}\n${req.prompt}`);
+          usage.outputTokens = estimateTokens(result.content);
+          usage.totalTokens = usage.inputTokens + usage.outputTokens;
+        }
+        usage.webSearchCalls = result.webSearchCalls;
+        sources = result.sources;
+
+        return {
+          providerId: 'chatgpt',
+          modelId,
+          status: 'success',
+          content: result.content,
+          sources,
+          usage,
+          usageIsEstimated,
+          latencyMs: Date.now() - start,
+          ttftMs,
+          rounds: 1,
+          rawResponse: result.raw,
+          webSearchBridged: false
+        };
+      }
+
+      let systemPrompt = req.system ?? '';
       if (req.webSearch && mode === 'bridge') {
         webSearchBridged = true;
         const bridge = await runSearchOnlyBridge(
@@ -67,7 +127,7 @@ export const chatgptProvider: Provider = {
           // GPT-5.x en Chat Completions n'accepte que la température par défaut (1)
           // et remplace `max_tokens` par `max_completion_tokens` (accepté aussi par
           // gpt-4.1 / gpt-4o, donc pas de branche par modèle).
-          max_completion_tokens: req.maxTokens ?? 4096
+          max_completion_tokens: req.maxTokens ?? 8192
         },
         callbacks: {
           onFirstToken: () => {
@@ -121,6 +181,118 @@ export const chatgptProvider: Provider = {
     }
   }
 };
+
+function mapResponsesUsage(u?: ResponsesUsage): TokenUsage {
+  return {
+    inputTokens: u?.input_tokens ?? 0,
+    outputTokens: u?.output_tokens ?? 0,
+    cachedInputTokens: u?.input_tokens_details?.cached_tokens ?? 0,
+    reasoningTokens: u?.output_tokens_details?.reasoning_tokens ?? 0,
+    totalTokens: u?.total_tokens ?? (u?.input_tokens ?? 0) + (u?.output_tokens ?? 0),
+    webSearchCalls: 0
+  };
+}
+
+/**
+ * Streams a Responses API call (`POST /v1/responses`), le seul endpoint OpenAI
+ * exposant l'outil de recherche web natif (`{ type: 'web_search' }`). Format SSE
+ * différent de Chat Completions : événements nommés (`event: response.…`) plutôt
+ * que des deltas `choices[0].delta`.
+ */
+async function streamResponsesApi(opts: {
+  apiKey: string;
+  body: Record<string, unknown>;
+  signal: AbortSignal;
+  onFirstToken?: () => void;
+  onContent?: (delta: string) => void;
+}): Promise<ResponsesStreamResult> {
+  const res = await fetch(`${BASE_URL}/responses`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${opts.apiKey}` },
+    body: JSON.stringify({ ...opts.body, stream: true }),
+    signal: opts.signal
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new ProviderHttpError(`http_${res.status}`, `HTTP ${res.status}: ${text.slice(0, 500)}`, res.status);
+  }
+  if (!res.body) throw new ProviderHttpError('no_body', 'Réponse sans corps');
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  let content = '';
+  let usage: ResponsesUsage | undefined;
+  const sources: RunResult['sources'] = [];
+  let webSearchCalls = 0;
+  const raw: unknown[] = [];
+  let firstTokenSeen = false;
+  let eventName = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('event:')) {
+        eventName = trimmed.slice(6).trim();
+        continue;
+      }
+      if (!trimmed.startsWith('data:')) continue;
+      const data = trimmed.slice(5).trim();
+      if (!data || data === '[DONE]') continue;
+      let json: any;
+      try {
+        json = JSON.parse(data);
+      } catch {
+        continue;
+      }
+      raw.push(json);
+
+      if (eventName === 'error' || json.type === 'error') {
+        const message = json.message ?? json.error?.message ?? 'Erreur Responses API';
+        throw new ProviderHttpError('stream_error', message);
+      }
+
+      if (eventName === 'response.output_text.delta' && typeof json.delta === 'string') {
+        content += json.delta;
+        if (!firstTokenSeen) {
+          firstTokenSeen = true;
+          opts.onFirstToken?.();
+        }
+        opts.onContent?.(json.delta);
+        continue;
+      }
+
+      if (eventName === 'response.output_item.added' && json.item?.type === 'web_search_call') {
+        webSearchCalls += 1;
+        continue;
+      }
+
+      if (eventName === 'response.completed') {
+        const response = json.response ?? {};
+        usage = response.usage;
+        for (const item of response.output ?? []) {
+          if (item.type !== 'message') continue;
+          for (const part of item.content ?? []) {
+            for (const ann of part.annotations ?? []) {
+              if (ann.type === 'url_citation') {
+                sources.push({ title: ann.title ?? ann.url, url: ann.url, snippet: undefined });
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return { content, usage, sources, webSearchCalls, raw };
+}
 
 function cancelledResult(
   modelId: string,

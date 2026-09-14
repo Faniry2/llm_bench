@@ -43,7 +43,7 @@ export const qwenProvider: Provider = {
         model: modelId,
         messages,
         temperature: req.temperature ?? 1,
-        max_tokens: req.maxTokens ?? 4096
+        max_tokens: req.maxTokens ?? 8192
       };
 
       if (req.webSearch) {
