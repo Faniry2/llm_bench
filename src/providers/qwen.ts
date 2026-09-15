@@ -1,6 +1,6 @@
 import type { Provider, RunRequest, RunResult, TokenUsage } from './types.js';
 import { emptyUsage } from './types.js';
-import { mapCommonUsage, streamChatCompletion, ProviderHttpError, type ChatMessage, type ChatCompletionBody } from './base.js';
+import { mapCommonUsage, streamChatCompletion, fetchModelList, ProviderHttpError, type ChatMessage, type ChatCompletionBody } from './base.js';
 import { estimateTokens } from '../pricing/tokenizer.js';
 import { providerModels, defaultModelId, resolveModelId } from './models.js';
 
@@ -48,11 +48,13 @@ export const qwenProvider: Provider = {
 
       if (req.webSearch) {
         body.enable_search = true;
+        // enable_source / enable_citation n'existent que sur l'API DashScope native ;
+        // le protocole OpenAI-compatible (utilisé ici) les ignore et ne renvoie de
+        // toute façon jamais de sources. Les envoyer semble faire tenir la requête
+        // indéfiniment côté serveur au lieu d'une erreur propre.
         body.search_options = {
-          search_strategy: options.searchStrategy ?? 'agent',
-          forced_search: options.forcedSearch ?? true,
-          enable_source: true,
-          enable_citation: true
+          search_strategy: options.searchStrategy ?? 'turbo',
+          forced_search: options.forcedSearch ?? false
         };
       }
       if (options.enableThinking !== undefined) {
@@ -116,6 +118,11 @@ export const qwenProvider: Provider = {
     } catch {
       return false;
     }
+  },
+
+  async listModels(apiKey: string, options?: Record<string, unknown>): Promise<string[]> {
+    const region = (options as QwenOptions | undefined)?.region;
+    return fetchModelList(region === 'cn' ? BASE_URL_CN : BASE_URL_INTL, apiKey);
   }
 };
 

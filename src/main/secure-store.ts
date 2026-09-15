@@ -16,6 +16,7 @@ interface StoreSchema {
   history: unknown[];
   lastPrompt: string;
   lastVariables: Record<string, string>;
+  lastKnowledgeDoc: { name: string; content: string } | null;
 }
 
 const store = new Store<StoreSchema>({
@@ -31,7 +32,8 @@ const store = new Store<StoreSchema>({
     theme: 'dark',
     history: [],
     lastPrompt: '',
-    lastVariables: {}
+    lastVariables: {},
+    lastKnowledgeDoc: null
   }
 });
 
@@ -119,6 +121,14 @@ export function getLastPromptState() {
 export function setLastPromptState(prompt: string, variables: Record<string, string>): void {
   store.set('lastPrompt', prompt);
   store.set('lastVariables', variables);
+}
+
+export function getKnowledgeDoc(): { name: string; content: string } | null {
+  return store.get('lastKnowledgeDoc');
+}
+
+export function setKnowledgeDoc(doc: { name: string; content: string } | null): void {
+  store.set('lastKnowledgeDoc', doc);
 }
 
 export default store;

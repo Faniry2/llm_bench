@@ -65,7 +65,7 @@ export const defaultRates: Record<ProviderId, RateCard> = {
   },
   kimi: {
     providerId: 'kimi',
-    modelId: 'kimi-k2.6',
+    modelId: 'kimi-k3',
     inputPerM: 0.95,
     cachedInputPerM: 0.95,
     outputPerM: 4.0,

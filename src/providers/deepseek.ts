@@ -1,6 +1,6 @@
 import type { Provider, RunRequest, RunResult, TokenUsage } from './types.js';
 import { emptyUsage, addUsage } from './types.js';
-import { mapCommonUsage, streamChatCompletion, ProviderHttpError, type ChatMessage } from './base.js';
+import { mapCommonUsage, streamChatCompletion, fetchModelList, ProviderHttpError, type ChatMessage } from './base.js';
 import { estimateTokens } from '../pricing/tokenizer.js';
 import { runSearchOnlyBridge } from './search-bridge.js';
 import { providerModels, defaultModelId, resolveModelId } from './models.js';
@@ -114,6 +114,10 @@ export const deepseekProvider: Provider = {
     } catch {
       return false;
     }
+  },
+
+  async listModels(apiKey: string): Promise<string[]> {
+    return fetchModelList(BASE_URL, apiKey);
   }
 };
 

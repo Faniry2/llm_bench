@@ -17,7 +17,9 @@ import {
   clearHistory,
   deleteHistoryEntry,
   getLastPromptState,
-  setLastPromptState
+  setLastPromptState,
+  getKnowledgeDoc,
+  setKnowledgeDoc
 } from './secure-store.js';
 
 export function registerIpcHandlers(): void {
@@ -49,6 +51,19 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  ipcMain.handle('models:list', async (_event, providerId: ProviderId, options?: Record<string, unknown>) => {
+    const apiKey = getApiKey(providerId);
+    if (!apiKey) return { ok: false as const, error: 'Aucune clé API configurée.' };
+    const provider = getProvider(providerId);
+    if (!provider.listModels) return { ok: false as const, error: 'Non supporté par ce fournisseur.' };
+    try {
+      const models = await provider.listModels(apiKey, options);
+      return { ok: true as const, models };
+    } catch (err) {
+      return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
   ipcMain.handle('rates:get', () => getRates());
   ipcMain.handle('rates:set', (_event, rates) => setRates(rates));
 
@@ -66,6 +81,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('promptState:set', (_event, prompt: string, variables: Record<string, string>) =>
     setLastPromptState(prompt, variables)
   );
+
+  ipcMain.handle('knowledgeDoc:get', () => getKnowledgeDoc());
+  ipcMain.handle('knowledgeDoc:set', (_event, doc: { name: string; content: string } | null) => setKnowledgeDoc(doc));
 
   ipcMain.handle('export:save', async (_event, opts: { defaultName: string; content: string; filters: { name: string; extensions: string[] }[] }) => {
     const win = BrowserWindow.getFocusedWindow();

@@ -35,6 +35,11 @@ export interface ModelSettings {
   options: Record<string, unknown>;
 }
 
+export interface KnowledgeDoc {
+  name: string;
+  content: string;
+}
+
 export interface HistoryEntry {
   id: string;
   timestamp: string;
@@ -49,11 +54,11 @@ let listenersRegistered = false;
 
 function defaultModelSettings(): Record<ProviderId, ModelSettings> {
   return {
-    deepseek: { enabled: true, webSearch: true, modelId: defaultModelId.deepseek, temperature: 1, maxTokens: 8192, options: { webSearchMode: 'bridge', bridgeProviderId: 'qwen' } },
-    qwen: { enabled: true, webSearch: true, modelId: defaultModelId.qwen, temperature: 1, maxTokens: 8192, options: { region: 'intl', searchStrategy: 'agent', forcedSearch: true } },
-    kimi: { enabled: true, webSearch: true, modelId: defaultModelId.kimi, temperature: 1, maxTokens: 8192, options: { region: 'global' } },
-    glm: { enabled: true, webSearch: true, modelId: defaultModelId.glm, temperature: 1, maxTokens: 8192, options: { searchEngine: 'search_pro_jina', resultCount: 10 } },
-    chatgpt: { enabled: true, webSearch: true, modelId: defaultModelId.chatgpt, temperature: 1, maxTokens: 8192, options: { webSearchMode: 'native', bridgeProviderId: 'qwen' } }
+    deepseek: { enabled: true, webSearch: true, modelId: defaultModelId.deepseek, temperature: 1, maxTokens: 16000, options: { webSearchMode: 'bridge', bridgeProviderId: 'qwen' } },
+    qwen: { enabled: true, webSearch: true, modelId: defaultModelId.qwen, temperature: 1, maxTokens: 16000, options: { region: 'intl', searchStrategy: 'turbo', forcedSearch: false } },
+    kimi: { enabled: true, webSearch: true, modelId: defaultModelId.kimi, temperature: 1, maxTokens: 16000, options: { region: 'global' } },
+    glm: { enabled: true, webSearch: true, modelId: defaultModelId.glm, temperature: 1, maxTokens: 16000, options: { searchEngine: 'search_pro_jina', resultCount: 10 } },
+    chatgpt: { enabled: true, webSearch: true, modelId: defaultModelId.chatgpt, temperature: 1, maxTokens: 16000, options: { webSearchMode: 'native', bridgeProviderId: 'qwen' } }
   };
 }
 
@@ -66,6 +71,11 @@ function fillVariables(prompt: string, variables: Record<string, string>): strin
   return prompt.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, name: string) => variables[name] ?? `{{${name}}}`);
 }
 
+function buildSystemPrompt(doc: KnowledgeDoc | null): string | undefined {
+  if (!doc?.content) return undefined;
+  return `Voici un document de référence à utiliser comme connaissance supplémentaire pour répondre à la demande de l'utilisateur (source : ${doc.name}) :\n\n<document>\n${doc.content}\n</document>`;
+}
+
 interface RunStore {
   prompt: string;
   /** id du template actif, "" si le prompt a été édité/tapé à la main. */
@@ -73,6 +83,7 @@ interface RunStore {
   templates: PromptTemplate[];
   variables: Record<string, string>;
   detectedVariableNames: string[];
+  knowledgeDoc: KnowledgeDoc | null;
   modelSettings: Record<ProviderId, ModelSettings>;
   globalWebSearch: boolean;
   runId: string | null;
@@ -93,6 +104,7 @@ interface RunStore {
   selectTemplate: (id: string) => void;
   clearPrompt: () => void;
   setVariable: (name: string, value: string) => void;
+  setKnowledgeDoc: (doc: KnowledgeDoc | null) => void;
   toggleModel: (id: ProviderId) => void;
   updateModelSettings: (id: ProviderId, patch: Partial<ModelSettings>) => void;
   setGlobalWebSearch: (value: boolean) => void;
@@ -133,6 +145,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
     date_analyse: new Date().toISOString().slice(0, 10)
   },
   detectedVariableNames: extractVariables(DEFAULT_TEMPLATE),
+  knowledgeDoc: null,
   modelSettings: defaultModelSettings(),
   globalWebSearch: true,
   runId: null,
@@ -152,6 +165,10 @@ export const useRunStore = create<RunStore>((set, get) => ({
   setPrompt: (prompt) =>
     set({ prompt, selectedTemplateId: matchTemplateId(prompt), detectedVariableNames: extractVariables(prompt) }),
   setVariable: (name, value) => set((s) => ({ variables: { ...s.variables, [name]: value } })),
+  setKnowledgeDoc: (doc) => {
+    set({ knowledgeDoc: doc });
+    void window.chinallm.knowledgeDoc.set(doc);
+  },
   toggleModel: (id) =>
     set((s) => ({ modelSettings: { ...s.modelSettings, [id]: { ...s.modelSettings[id], enabled: !s.modelSettings[id].enabled } } })),
   updateModelSettings: (id, patch) =>
@@ -172,12 +189,13 @@ export const useRunStore = create<RunStore>((set, get) => ({
   init: async () => {
     if (listenersRegistered) return;
     listenersRegistered = true;
-    const [settings, rates, keysPresent, history, promptState] = await Promise.all([
+    const [settings, rates, keysPresent, history, promptState, knowledgeDoc] = await Promise.all([
       window.chinallm.settings.get(),
       window.chinallm.rates.get(),
       window.chinallm.keys.has(),
       window.chinallm.history.get(),
-      window.chinallm.promptState.get()
+      window.chinallm.promptState.get(),
+      window.chinallm.knowledgeDoc.get()
     ]);
     set({
       rates,
@@ -185,7 +203,8 @@ export const useRunStore = create<RunStore>((set, get) => ({
       history: history as HistoryEntry[],
       usdToEur: (settings.usdToEur as number) ?? 0.92,
       deepseekPricingMode: (settings.deepseekPricingMode as 'auto' | 'peak' | 'off-peak') ?? 'auto',
-      theme: (settings.theme as 'dark' | 'light') ?? 'dark'
+      theme: (settings.theme as 'dark' | 'light') ?? 'dark',
+      knowledgeDoc
     });
     if (promptState.prompt) {
       set({
@@ -255,6 +274,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
     const s = get();
     await window.chinallm.promptState.set(s.prompt, s.variables);
     const filledPrompt = fillVariables(s.prompt, s.variables);
+    const system = buildSystemPrompt(s.knowledgeDoc);
     const models = PROVIDER_IDS.filter((id) => s.modelSettings[id].enabled).map((id) => {
       const ms = s.modelSettings[id];
       return { providerId: id, modelId: ms.modelId, webSearch: ms.webSearch, temperature: ms.temperature, maxTokens: ms.maxTokens, options: ms.options };
@@ -262,7 +282,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
     const live: Record<ProviderId, LiveCardState> = { deepseek: emptyLive(), qwen: emptyLive(), kimi: emptyLive(), glm: emptyLive(), chatgpt: emptyLive() };
     for (const m of models) live[m.providerId] = { ...emptyLive(), status: 'running', startedAt: Date.now() };
     set({ live, isRunning: true });
-    const runId = await window.chinallm.run.start({ prompt: filledPrompt, models });
+    const runId = await window.chinallm.run.start({ prompt: filledPrompt, system, models });
     set({ runId });
   },
 
@@ -277,10 +297,12 @@ export const useRunStore = create<RunStore>((set, get) => ({
     if (!s.modelSettings[providerId].enabled) return;
     await window.chinallm.promptState.set(s.prompt, s.variables);
     const filledPrompt = fillVariables(s.prompt, s.variables);
+    const system = buildSystemPrompt(s.knowledgeDoc);
     const ms = s.modelSettings[providerId];
     set((state) => ({ live: { ...state.live, [providerId]: { ...emptyLive(), status: 'running', startedAt: Date.now() } }, isRunning: true }));
     const runId = await window.chinallm.run.start({
       prompt: filledPrompt,
+      system,
       models: [{ providerId, modelId: ms.modelId, webSearch: ms.webSearch, temperature: ms.temperature, maxTokens: ms.maxTokens, options: ms.options }]
     });
     set({ runId });

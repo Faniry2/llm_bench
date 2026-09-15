@@ -1,6 +1,6 @@
 import type { Provider, RunRequest, RunResult, TokenUsage } from './types.js';
 import { emptyUsage, addUsage } from './types.js';
-import { mapCommonUsage, streamChatCompletion, ProviderHttpError, type ChatMessage, type ToolCall, type ChatCompletionBody } from './base.js';
+import { mapCommonUsage, streamChatCompletion, fetchModelList, ProviderHttpError, type ChatMessage, type ToolCall, type ChatCompletionBody } from './base.js';
 import { estimateTokens } from '../pricing/tokenizer.js';
 import { providerModels, defaultModelId, resolveModelId } from './models.js';
 
@@ -169,5 +169,10 @@ export const kimiProvider: Provider = {
     } catch {
       return false;
     }
+  },
+
+  async listModels(apiKey: string, options?: Record<string, unknown>): Promise<string[]> {
+    const region = (options as KimiOptions | undefined)?.region;
+    return fetchModelList(region === 'cn' ? BASE_URL_CN : BASE_URL_GLOBAL, apiKey);
   }
 };

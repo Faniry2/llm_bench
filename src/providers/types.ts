@@ -56,6 +56,8 @@ export interface Provider {
   models: { id: string; label: string }[];
   run(req: RunRequest, apiKey: string): Promise<RunResult>;
   testKey(apiKey: string): Promise<boolean>;
+  /** Lists model ids currently available to this account, when the provider exposes GET /models. */
+  listModels?(apiKey: string, options?: Record<string, unknown>): Promise<string[]>;
 }
 
 export function emptyUsage(): TokenUsage {

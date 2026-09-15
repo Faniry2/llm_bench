@@ -68,6 +68,20 @@ export class ProviderHttpError extends Error {
 
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 
+/** Lists model ids from an OpenAI-compatible GET /models endpoint. */
+export async function fetchModelList(baseUrl: string, apiKey: string): Promise<string[]> {
+  const res = await fetch(`${baseUrl}/models`, {
+    headers: { Authorization: `Bearer ${apiKey}` }
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new ProviderHttpError(`http_${res.status}`, `HTTP ${res.status}: ${text.slice(0, 300)}`, res.status);
+  }
+  const json = (await res.json()) as { data?: { id?: string }[] };
+  const ids = (json.data ?? []).map((m) => m.id).filter((id): id is string => Boolean(id));
+  return [...new Set(ids)].sort();
+}
+
 export function maskKey(key: string): string {
   if (!key) return '';
   if (key.length <= 8) return '****';
@@ -103,15 +117,22 @@ export interface FetchChatResult {
  * 4xx other than 429 fails immediately (no retry).
  */
 export async function streamChatCompletion(opts: FetchChatOptions): Promise<FetchChatResult> {
-  const timeoutMs = opts.timeoutMs ?? 180_000;
+  // Une recherche web forcée côté serveur (plusieurs sources croisées) plus une
+  // génération longue (gros max_tokens) peuvent légitimement dépasser 180s avant
+  // le premier token. On laisse plus de marge avant d'abandonner.
+  const timeoutMs = opts.timeoutMs ?? 300_000;
   const maxRetries = opts.maxRetries ?? 3;
 
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const timeoutController = new AbortController();
+    let timedOut = false;
     const onAbort = () => timeoutController.abort();
     opts.signal.addEventListener('abort', onAbort);
-    const timer = setTimeout(() => timeoutController.abort(), timeoutMs);
+    const timer = setTimeout(() => {
+      timedOut = true;
+      timeoutController.abort();
+    }, timeoutMs);
 
     try {
       const res = await fetch(`${opts.baseUrl}/chat/completions`, {
@@ -146,6 +167,10 @@ export async function streamChatCompletion(opts: FetchChatOptions): Promise<Fetc
       clearTimeout(timer);
       opts.signal.removeEventListener('abort', onAbort);
       if (opts.signal.aborted) throw err;
+      // Own client-side timeout (not a retryable HTTP status): the server never
+      // answered within timeoutMs, so retrying the same slow call just multiplies
+      // the wait. Fail fast with a clear message instead of a silent 4x retry.
+      if (timedOut) throw new ProviderHttpError('timeout', `Aucune réponse de l'API après ${timeoutMs / 1000}s.`);
       lastError = err;
       if (err instanceof ProviderHttpError) {
         if (err.status && !RETRYABLE_STATUS.has(err.status)) throw err;

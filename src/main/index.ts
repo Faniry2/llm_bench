@@ -1,10 +1,30 @@
 import { app, BrowserWindow, shell } from 'electron';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { registerIpcHandlers } from './ipc.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
+
+// electron-vite runs the app directly (no shell), so process.env never
+// picks up a project-root .env the way a terminal-launched script would.
+// Load it ourselves in dev; existing env vars still win.
+function loadDotEnv(filePath: string): void {
+  if (!fs.existsSync(filePath)) return;
+  for (const line of fs.readFileSync(filePath, 'utf-8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    if (/^".*"$/.test(value) || /^'.*'$/.test(value)) value = value.slice(1, -1);
+    if (key && !(key in process.env)) process.env[key] = value;
+  }
+}
+
+if (isDev) loadDotEnv(path.join(__dirname, '../../.env'));
 
 function createWindow(): void {
   const win = new BrowserWindow({

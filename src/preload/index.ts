@@ -41,6 +41,10 @@ const api = {
     has: (): Promise<Partial<Record<ProviderId, boolean>>> => ipcRenderer.invoke('keys:has'),
     test: (providerId: ProviderId): Promise<boolean> => ipcRenderer.invoke('keys:test', providerId)
   },
+  models: {
+    list: (providerId: ProviderId, options?: Record<string, unknown>): Promise<{ ok: boolean; models?: string[]; error?: string }> =>
+      ipcRenderer.invoke('models:list', providerId, options)
+  },
   rates: {
     get: (): Promise<Record<ProviderId, RateCard>> => ipcRenderer.invoke('rates:get'),
     set: (rates: Record<ProviderId, RateCard>): Promise<void> => ipcRenderer.invoke('rates:set', rates)
@@ -59,6 +63,10 @@ const api = {
     get: (): Promise<{ prompt: string; variables: Record<string, string> }> => ipcRenderer.invoke('promptState:get'),
     set: (prompt: string, variables: Record<string, string>): Promise<void> =>
       ipcRenderer.invoke('promptState:set', prompt, variables)
+  },
+  knowledgeDoc: {
+    get: (): Promise<{ name: string; content: string } | null> => ipcRenderer.invoke('knowledgeDoc:get'),
+    set: (doc: { name: string; content: string } | null): Promise<void> => ipcRenderer.invoke('knowledgeDoc:set', doc)
   },
   exportFile: {
     save: (opts: {

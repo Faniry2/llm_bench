@@ -66,8 +66,9 @@ export default function StatsPanel(): React.ReactElement {
   }, [live, rates, deepseekPricingMode]);
 
   const currentRunCostUsd = rows.reduce((sum, r) => sum + r.cost.totalCost, 0);
-  const sessionCostUsd = useMemo(() => history.reduce((sum, h) => sum + h.totalCostUsd, 0), [history]);
-  const totalCostUsd = sessionCostUsd; // persisted history *is* the cumulative total across sessions
+  // History is persisted across app restarts, so this is the all-time cumulative cost,
+  // not just the current session.
+  const totalCostUsd = useMemo(() => history.reduce((sum, h) => sum + h.totalCostUsd, 0), [history]);
 
   const cheapestId = rows.length ? rows.reduce((a, b) => (a.cost.totalCost <= b.cost.totalCost ? a : b)).id : null;
   const priciestId = rows.length ? rows.reduce((a, b) => (a.cost.totalCost >= b.cost.totalCost ? a : b)).id : null;
@@ -174,8 +175,7 @@ export default function StatsPanel(): React.ReactElement {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <SummaryCard label="Coût du run courant" value={`$${currentRunCostUsd.toFixed(4)}`} sub={`€${(currentRunCostUsd * usdToEur).toFixed(4)}`} />
-        <SummaryCard label="Coût cumulé session" value={`$${sessionCostUsd.toFixed(4)}`} />
-        <SummaryCard label="Coût cumulé total" value={`$${totalCostUsd.toFixed(4)}`} />
+        <SummaryCard label="Coût cumulé (historique)" value={`$${totalCostUsd.toFixed(4)}`} sub={`€${(totalCostUsd * usdToEur).toFixed(4)}`} />
         <SummaryCard
           label="Projection N runs"
           value={`$${projectCost(currentRunCostUsd, projectionRuns).toFixed(2)}`}
@@ -208,7 +208,7 @@ export default function StatsPanel(): React.ReactElement {
         <table className="w-full min-w-[900px] text-left text-xs">
           <thead className="text-slate-500">
             <tr>
-              {['Modèle', 'In', 'Cache', 'Out', 'Raisonnement', 'Total', 'Recherches', 'Latence', 'TTFT', 'Tours', '$', '€', '$/1k tok'].map((h) => (
+              {['Modèle', 'Tokens in', 'Tokens out', 'Coût input', 'Coût output', 'Coût total', '€ total', 'Latence', 'Recherches'].map((h) => (
                 <th key={h} className="border-b border-slate-800 px-2 py-1 font-medium">
                   {h}
                 </th>
@@ -225,33 +225,26 @@ export default function StatsPanel(): React.ReactElement {
                   {LABELS[r.id]} {r.result.usageIsEstimated && <span title="Usage estimé (tiktoken)">⚠️</span>}
                 </td>
                 <td className="px-2 py-1">{r.result.usage.inputTokens.toLocaleString()}</td>
-                <td className="px-2 py-1">{r.result.usage.cachedInputTokens.toLocaleString()}</td>
                 <td className="px-2 py-1">{r.result.usage.outputTokens.toLocaleString()}</td>
-                <td className="px-2 py-1">{r.result.usage.reasoningTokens.toLocaleString()}</td>
-                <td className="px-2 py-1">{r.result.usage.totalTokens.toLocaleString()}</td>
-                <td className="px-2 py-1">{r.result.usage.webSearchCalls}</td>
-                <td className="px-2 py-1">{(r.result.latencyMs / 1000).toFixed(1)}s</td>
-                <td className="px-2 py-1">{r.result.ttftMs ? `${(r.result.ttftMs / 1000).toFixed(1)}s` : '—'}</td>
-                <td className="px-2 py-1">{r.result.rounds}</td>
-                <td className="px-2 py-1">${r.cost.totalCost.toFixed(4)}</td>
+                <td className="px-2 py-1">${(r.cost.inputCost + r.cost.cachedInputCost).toFixed(4)}</td>
+                <td className="px-2 py-1">${r.cost.outputCost.toFixed(4)}</td>
+                <td className="px-2 py-1 font-semibold">${r.cost.totalCost.toFixed(4)}</td>
                 <td className="px-2 py-1">€{(r.cost.totalCost * usdToEur).toFixed(4)}</td>
-                <td className="px-2 py-1">${r.cost.usdPerKTokens.toFixed(4)}</td>
+                <td className="px-2 py-1">{(r.result.latencyMs / 1000).toFixed(1)}s</td>
+                <td className="px-2 py-1">{r.result.usage.webSearchCalls}</td>
               </tr>
             ))}
             {rows.length > 0 && (
               <tr className="border-t border-slate-700 font-semibold">
                 <td className="px-2 py-1">TOTAL</td>
                 <td className="px-2 py-1">{rows.reduce((s, r) => s + r.result.usage.inputTokens, 0).toLocaleString()}</td>
-                <td className="px-2 py-1">{rows.reduce((s, r) => s + r.result.usage.cachedInputTokens, 0).toLocaleString()}</td>
                 <td className="px-2 py-1">{rows.reduce((s, r) => s + r.result.usage.outputTokens, 0).toLocaleString()}</td>
-                <td className="px-2 py-1">{rows.reduce((s, r) => s + r.result.usage.reasoningTokens, 0).toLocaleString()}</td>
-                <td className="px-2 py-1">{rows.reduce((s, r) => s + r.result.usage.totalTokens, 0).toLocaleString()}</td>
-                <td className="px-2 py-1">{rows.reduce((s, r) => s + r.result.usage.webSearchCalls, 0)}</td>
-                <td colSpan={2} className="px-2 py-1" />
-                <td className="px-2 py-1" />
+                <td className="px-2 py-1">${rows.reduce((s, r) => s + r.cost.inputCost + r.cost.cachedInputCost, 0).toFixed(4)}</td>
+                <td className="px-2 py-1">${rows.reduce((s, r) => s + r.cost.outputCost, 0).toFixed(4)}</td>
                 <td className="px-2 py-1">${currentRunCostUsd.toFixed(4)}</td>
                 <td className="px-2 py-1">€{(currentRunCostUsd * usdToEur).toFixed(4)}</td>
                 <td className="px-2 py-1" />
+                <td className="px-2 py-1">{rows.reduce((s, r) => s + r.result.usage.webSearchCalls, 0)}</td>
               </tr>
             )}
           </tbody>

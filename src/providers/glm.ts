@@ -1,6 +1,6 @@
 import type { Provider, RunRequest, RunResult, TokenUsage } from './types.js';
 import { emptyUsage } from './types.js';
-import { mapCommonUsage, streamChatCompletion, ProviderHttpError, type ChatMessage, type ChatCompletionBody } from './base.js';
+import { mapCommonUsage, streamChatCompletion, fetchModelList, ProviderHttpError, type ChatMessage, type ChatCompletionBody } from './base.js';
 import { estimateTokens } from '../pricing/tokenizer.js';
 import { providerModels, defaultModelId, resolveModelId } from './models.js';
 
@@ -112,6 +112,10 @@ export const glmProvider: Provider = {
     } catch {
       return false;
     }
+  },
+
+  async listModels(apiKey: string): Promise<string[]> {
+    return fetchModelList(BASE_URL, apiKey);
   }
 };
 

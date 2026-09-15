@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useRunStore, PROVIDER_IDS } from '../store/useRunStore.js';
 import type { ProviderId } from '../../providers/types.js';
-import { providerModels } from '../../providers/models.js';
+import { providerModels, defaultModelId } from '../../providers/models.js';
 
 const CUSTOM_MODEL = '__custom__';
 
@@ -28,6 +28,25 @@ export default function ModelSelector(): React.ReactElement {
   const globalWebSearch = useRunStore((s) => s.globalWebSearch);
   const setGlobalWebSearch = useRunStore((s) => s.setGlobalWebSearch);
   const [openGear, setOpenGear] = useState<ProviderId | null>(null);
+  const [availableModels, setAvailableModels] = useState<Partial<Record<ProviderId, string[]>>>({});
+  const [modelListStatus, setModelListStatus] = useState<Partial<Record<ProviderId, 'loading' | 'error'>>>({});
+  const [modelListError, setModelListError] = useState<Partial<Record<ProviderId, string>>>({});
+
+  async function fetchModels(id: ProviderId) {
+    setModelListStatus((s) => ({ ...s, [id]: 'loading' }));
+    const res = await window.chinallm.models.list(id, modelSettings[id].options);
+    if (res.ok && res.models) {
+      setAvailableModels((s) => ({ ...s, [id]: res.models }));
+      setModelListStatus((s) => {
+        const next = { ...s };
+        delete next[id];
+        return next;
+      });
+    } else {
+      setModelListError((s) => ({ ...s, [id]: res.error ?? 'Erreur inconnue' }));
+      setModelListStatus((s) => ({ ...s, [id]: 'error' }));
+    }
+  }
 
   return (
     <div className="mt-3">
@@ -47,7 +66,7 @@ export default function ModelSelector(): React.ReactElement {
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={ms.enabled} onChange={() => toggleModel(id)} />
-                  {LABELS[id]}
+                  {ms.modelId?.trim() || LABELS[id]}
                 </label>
                 <button className="btn-sm" onClick={() => setOpenGear(openGear === id ? null : id)}>
                   ⚙️
@@ -100,6 +119,37 @@ export default function ModelSelector(): React.ReactElement {
                       onChange={(e) => updateModelSettings(id, { webSearch: e.target.checked })}
                     />
                   </label>
+                  <label className="flex items-center justify-between gap-2">
+                    <span>ID du modèle</span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        list={`models-${id}`}
+                        className="input w-28 py-0.5"
+                        value={ms.modelId ?? ''}
+                        placeholder={defaultModelId[id]}
+                        onChange={(e) => updateModelSettings(id, { modelId: e.target.value })}
+                      />
+                      <datalist id={`models-${id}`}>
+                        {(availableModels[id] ?? []).map((m) => (
+                          <option key={m} value={m} />
+                        ))}
+                      </datalist>
+                      <button
+                        type="button"
+                        className="btn-sm"
+                        title="Lister les modèles disponibles pour ce compte"
+                        onClick={() => void fetchModels(id)}
+                        disabled={modelListStatus[id] === 'loading'}
+                      >
+                        {modelListStatus[id] === 'loading' ? '…' : '🔄'}
+                      </button>
+                    </div>
+                  </label>
+                  {availableModels[id] && (
+                    <p className="text-[10px] text-slate-500">{availableModels[id]!.length} modèles trouvés — choisis-en un dans la liste.</p>
+                  )}
+                  {modelListStatus[id] === 'error' && <p className="text-[10px] text-red-400">{modelListError[id]}</p>}
                   <label className="flex items-center justify-between gap-2">
                     <span>Température</span>
                     <input
@@ -197,7 +247,7 @@ export default function ModelSelector(): React.ReactElement {
                         <span>Stratégie</span>
                         <select
                           className="input w-28 py-0.5"
-                          value={(ms.options.searchStrategy as string) ?? 'agent'}
+                          value={(ms.options.searchStrategy as string) ?? 'turbo'}
                           onChange={(e) => updateModelSettings(id, { options: { ...ms.options, searchStrategy: e.target.value } })}
                         >
                           <option value="turbo">turbo</option>
@@ -205,6 +255,14 @@ export default function ModelSelector(): React.ReactElement {
                           <option value="agent">agent</option>
                           <option value="agent_max">agent_max</option>
                         </select>
+                      </label>
+                      <label className="flex items-center justify-between gap-2">
+                        <span>Recherche forcée</span>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(ms.options.forcedSearch)}
+                          onChange={(e) => updateModelSettings(id, { options: { ...ms.options, forcedSearch: e.target.checked } })}
+                        />
                       </label>
                       <label className="flex items-center justify-between gap-2">
                         <span>Mode réflexion</span>
